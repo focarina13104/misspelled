@@ -1,5 +1,6 @@
 export default {
   returnToWordSprout: 'Word Sprout に戻る',
+  settings: '設定', closeSettings: '閉じる',
   appName: 'Misspelled', tagline: 'ひとつの単語から、伝わる言葉へ。',
   eyebrow: '単語をもっと確かに', heroTitle: '書きたかった単語を見つけよう。',
   heroDescription: '英単語のスペルを確認したり、つづりの似た単語を探したり。単語をひとつ入力するだけ。',

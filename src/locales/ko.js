@@ -1,5 +1,6 @@
 export default {
   returnToWordSprout: 'Word Sprout로 돌아가기',
+  settings: '설정', closeSettings: '닫기',
   appName: 'Misspelled', tagline: '한 단어씩, 더 정확하게.',
   eyebrow: '단어를 더 정확하게', heroTitle: '쓰고 싶었던 단어를 찾아보세요.',
   heroDescription: '영어 철자를 확인하거나 철자가 비슷한 단어를 찾아보세요. 단어 하나면 충분해요.',

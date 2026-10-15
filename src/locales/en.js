@@ -1,5 +1,6 @@
 export default {
   returnToWordSprout: 'Return to Word Sprout',
+  settings: 'Settings', closeSettings: 'Close',
   appName: 'Misspelled', tagline: 'A little clarity, one word at a time.',
   eyebrow: 'YOUR WORD, MADE CLEAR', heroTitle: 'Find the word you meant.',
   heroDescription: 'Check an English spelling or explore similar words. One word is all you need.',

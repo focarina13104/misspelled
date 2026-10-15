@@ -1,5 +1,6 @@
 export default {
   returnToWordSprout: '返回 Word Sprout',
+  settings: '设置', closeSettings: '关闭',
   appName: 'Misspelled', tagline: '一次一个单词，写得更准确。',
   eyebrow: '让每个单词更清晰', heroTitle: '找到你想写的单词。',
   heroDescription: '检查英文拼写，或查找拼写相近的单词。每次只需输入一个单词。',

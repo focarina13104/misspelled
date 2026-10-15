@@ -11,10 +11,15 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
     <header class="topbar">
       <div class="brand"><div class="brand-mark" aria-hidden="true">m<span>✓</span></div><div><div class="brand-name">Misspelled<span class="brand-dot">.</span></div><p data-text="tagline"></p></div></div>
       <div class="header-actions">
-        <button id="return-word-sprout" type="button" class="button secondary" data-text="returnToWordSprout"></button>
-        <div class="language-control"><label for="language" data-text="language"></label><select id="language"></select></div>
+        <button id="return-word-sprout" type="button" class="button secondary" data-text="returnToWordSprout" hidden></button>
+        <button id="open-settings" type="button" class="button secondary" aria-haspopup="dialog" aria-controls="settings-panel" aria-expanded="false" data-text="settings"></button>
       </div>
     </header>
+    <dialog id="settings-panel" class="settings-panel" aria-labelledby="settings-title">
+      <div class="settings-heading"><h2 id="settings-title" data-text="settings"></h2><button id="close-settings" type="button" class="button secondary" data-text="closeSettings"></button></div>
+      <div class="settings-field"><label for="language" data-text="language"></label><select id="language" autofocus></select></div>
+      <div class="settings-field"><label for="extra-letter-style" data-text="extraLetterStyle"></label><select id="extra-letter-style"><option value="highlight" data-text="styleHighlight"></option><option value="strike" data-text="styleStrike"></option></select></div>
+    </dialog>
     <main class="main-content">
       <section class="hero" aria-labelledby="hero-title"><p class="eyebrow hero-eyebrow"><span class="tiny-dot" aria-hidden="true"></span><span data-text="eyebrow"></span></p><h1 id="hero-title" data-text="heroTitle"></h1><p class="hero-description" data-text="heroDescription"></p></section>
       <div class="workspace">
@@ -34,7 +39,6 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
         <section class="panel result-panel" aria-labelledby="result-title">
           <div class="panel-heading"><span class="step-number" aria-hidden="true">02</span><p class="eyebrow" data-text="resultEyebrow"></p><span id="result-count" class="count-badge"></span></div>
           <h2 id="result-title" data-text="resultTitle"></h2>
-          <div class="comparison-preferences"><label for="extra-letter-style" data-text="extraLetterStyle"></label><select id="extra-letter-style"><option value="highlight" data-text="styleHighlight"></option><option value="strike" data-text="styleStrike"></option></select></div>
           <div id="results" class="results" aria-live="polite" aria-atomic="true"></div>
         </section>
       </div>
@@ -46,8 +50,37 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
   const language = query('#language');
   const results = query('#results');
   const feedback = query('#word-feedback');
+  const settingsPanel = query('#settings-panel');
+  const settingsButton = query('#open-settings');
   const events = new AbortController();
   const listen = (element, event, handler) => element.addEventListener(event, handler, { signal: events.signal });
+  listen(settingsButton, 'click', () => {
+    if (!settingsPanel.open) settingsPanel.showModal();
+    settingsButton.setAttribute('aria-expanded', 'true');
+  });
+  listen(query('#close-settings'), 'click', () => settingsPanel.close());
+  listen(settingsPanel, 'close', () => {
+    settingsButton.setAttribute('aria-expanded', 'false');
+    settingsButton.focus();
+  });
+  listen(settingsPanel, 'keydown', event => {
+    if (event.key !== 'Tab') return;
+    const controls = settingsPanel.querySelectorAll('button:not(:disabled), select:not(:disabled)');
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+  listen(settingsPanel, 'click', event => {
+    if (event.target !== settingsPanel) return;
+    const bounds = settingsPanel.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) settingsPanel.close();
+  });
   let copyFeedback = '';
   let copyAttempt = 0;
   let previousInput = '';
@@ -310,5 +343,5 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
     }
     results.classList.toggle('has-results', Boolean(state.result?.ok));
   }
-  return { render, dispose() { comparisonObserver?.disconnect(); events.abort(); client.dispose(); } };
+  return { render, dispose() { comparisonObserver?.disconnect(); if (settingsPanel.open) settingsPanel.close(); events.abort(); client.dispose(); } };
 }
