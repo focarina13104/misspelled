@@ -1,0 +1,29 @@
+{
+  "name": "misspelled",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "prepare-assets": "node scripts/prepare-assets.mjs",
+    "prestart": "npm run prepare-assets",
+    "start": "vite --host 127.0.0.1",
+    "predev": "npm run prepare-assets",
+    "dev": "vite --host 127.0.0.1",
+    "pretest": "npm run prepare-assets",
+    "test": "node --test tests/*.test.js",
+    "prebuild": "npm run prepare-assets",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "dictionary-en": "^4.0.0",
+    "dictionary-en-gb": "^3.0.0",
+    "nspell": "^2.1.5"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}
