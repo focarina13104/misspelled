@@ -54,7 +54,59 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
   const settingsButton = query('#open-settings');
   const events = new AbortController();
   const listen = (element, event, handler) => element.addEventListener(event, handler, { signal: events.signal });
+  let clearAnimations = [];
+  let clearSnapshots = [];
+  let clearTransition = 0;
+  function stopClearTransition() {
+    clearTransition++;
+    for (const animation of clearAnimations) animation.cancel();
+    for (const snapshot of clearSnapshots) snapshot.remove();
+    clearAnimations = [];
+    clearSnapshots = [];
+  }
+  function clearWord() {
+    stopClearTransition();
+    const animate = typeof input.animate === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const snapshots = [];
+    const scrollPositions = new Map();
+    if (animate && client.getState().input) {
+      for (const element of [input, results]) {
+        const bounds = element.getBoundingClientRect();
+        const snapshot = element.cloneNode(true);
+        snapshot.removeAttribute('id');
+        for (const child of snapshot.querySelectorAll('[id]')) child.removeAttribute('id');
+        snapshot.classList.add('clear-snapshot');
+        snapshot.setAttribute('aria-hidden', 'true');
+        snapshot.inert = true;
+        if (element === input) {
+          snapshot.classList.add('clear-input-snapshot');
+          snapshot.value = input.value;
+        }
+        Object.assign(snapshot.style, { left: `${bounds.left}px`, top: `${bounds.top}px`, width: `${bounds.width}px`, height: `${bounds.height}px` });
+        scrollPositions.set(snapshot, { left: element.scrollLeft, top: element.scrollTop });
+        snapshots.push(snapshot);
+      }
+    }
+    client.clear();
+    input.focus();
+    if (!snapshots.length) return;
+    clearSnapshots = snapshots;
+    document.body.append(...snapshots);
+    for (const [snapshot, position] of scrollPositions) {
+      snapshot.scrollLeft = position.left;
+      snapshot.scrollTop = position.top;
+    }
+    const timing = { duration: 240, easing: 'ease-out' };
+    clearAnimations = [
+      ...snapshots.map(snapshot => snapshot.animate([{ opacity: 1 }, { opacity: 0 }], timing)),
+      results.animate([{ opacity: 0 }, { opacity: 1 }], timing),
+    ];
+    const transition = clearTransition;
+    const finish = () => { if (transition === clearTransition) stopClearTransition(); };
+    Promise.all(clearAnimations.map(animation => animation.finished)).then(finish, finish);
+  }
   listen(settingsButton, 'click', () => {
+    stopClearTransition();
     if (!settingsPanel.open) settingsPanel.showModal();
     settingsButton.setAttribute('aria-expanded', 'true');
   });
@@ -85,10 +137,19 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
   let copyAttempt = 0;
   let previousInput = '';
   let selectedWord = null;
+  let correctedWord = null;
+  const actionWord = () => correctedWord ?? client.getState().input.trim();
+  const run = mode => client.run(mode, actionWord());
+  function setCorrection(word) {
+    correctedWord = word;
+    copyAttempt++;
+    copyFeedback = '';
+    query('#copy-feedback').textContent = '';
+  }
   let extraLetterStyle = loadExtraLetterStyle(storage);
   let refreshComparison = () => {};
   let comparisonObserver;
-  listen(window, 'resize', () => refreshComparison());
+  listen(window, 'resize', () => { stopClearTransition(); refreshComparison(); });
   document.fonts?.ready.then(() => { if (!events.signal.aborted) refreshComparison(); });
   const styleSelect = query('#extra-letter-style');
   styleSelect.value = extraLetterStyle;
@@ -110,26 +171,39 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
     input.setSelectionRange(selectionStart, selectionEnd, selectionDirection);
   });
   listen(input, 'keydown', event => {
-    if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); client.run('check'); }
+    if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); run('check'); }
   });
-  listen(query('#word-form'), 'submit', event => { event.preventDefault(); client.run('check'); });
-  listen(query('#similar'), 'click', () => client.run('similar'));
-  listen(query('#clear'), 'click', () => { client.clear(); input.focus(); });
+  listen(query('#word-form'), 'submit', event => { event.preventDefault(); run('check'); });
+  listen(query('#similar'), 'click', () => run('similar'));
+  listen(query('#clear'), 'click', clearWord);
   listen(language, 'change', () => { setLocale(language.value); render(); });
   listen(query('#copy'), 'click', async () => {
-    const word = client.getState().input.trim();
+    const word = actionWord();
     const attempt = ++copyAttempt;
+    let fallback = false;
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Unavailable');
       await navigator.clipboard.writeText(word);
       if (attempt === copyAttempt) copyFeedback = 'copied';
     } catch {
-      if (attempt === copyAttempt) { input.focus(); input.select(); copyFeedback = 'copyFallback'; }
+      if (attempt === copyAttempt) { fallback = true; copyFeedback = 'copyFallback'; }
     }
+    if (attempt !== copyAttempt) return;
     render();
+    if (fallback) {
+      const correction = query('.correction-box .comparison-word');
+      if (correction && correction.textContent === word) {
+        const range = document.createRange();
+        range.selectNodeContents(correction);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else { input.focus(); input.select(); }
+    }
   });
 
   function render() {
+    stopClearTransition();
     const state = client.getState();
     const locale = getLocale();
     const translate = (key, params) => t(locale, key, params);
@@ -140,7 +214,7 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
     document.title = 'Misspelled';
     language.value = locale;
     for (const element of root.querySelectorAll('[data-text]')) element.textContent = translate(element.dataset.text);
-    if (state.input !== previousInput) { copyAttempt++; copyFeedback = ''; previousInput = state.input; }
+    if (state.input !== previousInput) { setCorrection(null); previousInput = state.input; }
     if (input.value !== state.input) input.value = state.input;
     const length = state.input.trim().length;
     const count = query('#character-count');
@@ -184,6 +258,7 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
       add('p', translate('emptyDescription'), 'muted');
     } else {
       const result = state.result;
+      const originalText = state.input.trim();
       const status = add('p', '', result.correct ? 'spelling-status correct-status' : 'spelling-status warning-status');
       status.textContent = `${result.correct ? '✓' : '!'} ${translate(result.correct ? 'correctTitle' : 'incorrectDescription', { word: result.word })}`;
       if (state.mode === 'similar') {
@@ -200,12 +275,13 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
         originalWord = document.createElement('div');
         originalWord.className = 'comparison-word original-word';
         originalWord.lang = 'en';
-        originalWord.textContent = result.word;
+        originalWord.textContent = originalText;
         original.append(originalLabel, originalWord);
       }
-      if (result.suggestions.length) {
+      if (result.suggestions.length || (originalWord && result.word !== originalText)) {
         const comparison = add('div', '', 'comparison-box correction-box');
         comparison.setAttribute('aria-live', 'off');
+        comparison.tabIndex = -1;
         const label = document.createElement('p');
         label.className = 'comparison-label';
         label.textContent = translate('correctedLabel');
@@ -222,12 +298,12 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
         reselect.className = 'button secondary comparison-reselect';
         reselect.textContent = translate('reselect');
         reselect.addEventListener('click', () => {
-          const previousSelection = selectedWord;
           selectedWord = null;
+          setCorrection(null);
           hovered = null;
           focused = null;
-          showComparison();
-          suggestionButtons.find(button => button.textContent === previousSelection)?.focus();
+          reserveComparisonSpace();
+          comparison.focus();
         });
         const reset = document.createElement('button');
         reset.type = 'button';
@@ -242,11 +318,11 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
         const choiceHint = document.createElement('p');
         choiceHint.className = 'choice-hint';
         function showComparison(candidate = selectedWord ?? hovered ?? focused) {
-          const selected = Boolean(candidate && candidate === selectedWord);
+          const selected = Boolean(candidate && candidate === selectedWord) || (!result.suggestions.length && result.correct);
+          const displayedWord = candidate ?? correctedWord ?? originalText;
           originalWord.classList.toggle('strike-extra', extraLetterStyle === 'strike');
           originalWord.replaceChildren();
-          if (!candidate) originalWord.textContent = result.word;
-          else for (const part of compareWord(result.word, candidate, { separateDeletions: true })) {
+          for (const part of compareWord(originalText, displayedWord, { separateDeletions: true })) {
             if (!part.text) continue;
             const extra = part.type === 'changed' && !part.expected;
             const segment = document.createElement(extra ? 'mark' : 'span');
@@ -259,9 +335,8 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
           }
           preview.classList.toggle('is-corrected', selected);
           preview.replaceChildren();
-          if (!candidate) preview.textContent = result.word;
           // Align from the candidate so every displayed character belongs to the correction.
-          else for (const part of compareWord(candidate, result.word)) {
+          for (const part of compareWord(displayedWord, originalText)) {
             if (part.type === 'gap') continue;
             const segment = document.createElement(part.type === 'same' ? 'span' : 'mark');
             segment.textContent = part.text;
@@ -271,12 +346,12 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
             }
             preview.append(segment);
           }
-          hint.hidden = selected;
+          hint.hidden = selected || !result.suggestions.length;
           hint.textContent = selected ? '' : candidate ? translate('comparingWith', { word: candidate }) : translate('comparisonHint');
-          reset.hidden = !selectedWord;
+          reset.hidden = !selectedWord && !correctedWord;
           reselect.hidden = !selectedWord;
-          comparisonActions.hidden = !selectedWord;
-          choiceHint.hidden = Boolean(selectedWord);
+          comparisonActions.hidden = reset.hidden && reselect.hidden;
+          choiceHint.hidden = Boolean(selectedWord) || !result.suggestions.length;
           choiceHint.textContent = selectedWord ? '' : translate('choiceHint');
           for (const button of suggestionButtons) {
             button.setAttribute('aria-pressed', String(button.textContent === selectedWord));
@@ -290,11 +365,8 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
           comparison.style.minHeight = '';
           let originalHeight = 0;
           let correctionHeight = 0;
-          for (const word of [null, ...result.suggestions]) {
+          for (const word of selectedWord ? [selectedWord] : [null, ...result.suggestions]) {
             showComparison(word);
-            comparisonActions.hidden = false;
-            reselect.hidden = false;
-            reset.hidden = false;
             originalHeight = Math.max(originalHeight, originalBox.getBoundingClientRect().height);
             correctionHeight = Math.max(correctionHeight, comparison.getBoundingClientRect().height);
           }
@@ -315,7 +387,7 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
           button.addEventListener('mouseleave', () => { hovered = null; showComparison(); });
           button.addEventListener('focus', () => { if (selectedWord) return; hovered = null; focused = word; showComparison(); });
           button.addEventListener('blur', () => { focused = null; showComparison(); });
-          button.addEventListener('click', () => { if (selectedWord) return; selectedWord = word; hovered = null; focused = null; showComparison(); reselect.focus(); });
+          button.addEventListener('click', () => { if (selectedWord) return; selectedWord = word; setCorrection(word); hovered = null; focused = null; reserveComparisonSpace(); reselect.focus(); });
           suggestionButtons.push(button);
           choices.append(button);
         }
@@ -343,5 +415,5 @@ export function mountUI(root, { client, getLocale, setLocale, storage }) {
     }
     results.classList.toggle('has-results', Boolean(state.result?.ok));
   }
-  return { render, dispose() { comparisonObserver?.disconnect(); if (settingsPanel.open) settingsPanel.close(); events.abort(); client.dispose(); } };
+  return { render, dispose() { stopClearTransition(); comparisonObserver?.disconnect(); if (settingsPanel.open) settingsPanel.close(); events.abort(); client.dispose(); } };
 }

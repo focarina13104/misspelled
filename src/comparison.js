@@ -20,7 +20,10 @@ export function compareWord(source, target, { separateDeletions = false } = {}) 
   let i = a.length;
   let j = b.length;
   while (i || j) {
-    if (i && j && a[i - 1] === b[j - 1] && cost[i][j] === cost[i - 1][j - 1]) {
+    // On an equal-cost repeated-letter match, keep the earlier copy unchanged.
+    if (i > 1 && j && a[i - 1] === a[i - 2] && a[i - 1] === b[j - 1] && cost[i][j] === cost[i - 1][j] + 1) {
+      reversed.push({ type: 'changed', text: original[--i], expected: '' });
+    } else if (i && j && a[i - 1] === b[j - 1] && cost[i][j] === cost[i - 1][j - 1]) {
       reversed.push({ type: 'same', text: original[--i] });
       j--;
     } else if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1] && cost[i][j] === cost[i - 2][j - 2] + 1) {

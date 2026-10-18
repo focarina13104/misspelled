@@ -1,24 +1,23 @@
 import en from './locales/en.js';
-import zhHK from './locales/zh-HK.js';
 import zhTW from './locales/zh-TW.js';
 import zhCN from './locales/zh-CN.js';
 import ja from './locales/ja.js';
 import ko from './locales/ko.js';
 
-export const messages = { en, 'zh-HK': zhHK, 'zh-TW': zhTW, 'zh-CN': zhCN, ja, ko };
+export const messages = { en, 'zh-TW': zhTW, 'zh-CN': zhCN, ja, ko };
 export const supportedLocales = [
-  { id: 'en', label: 'English' }, { id: 'zh-HK', label: '中文（香港）' },
+  { id: 'en', label: 'English' },
   { id: 'zh-TW', label: '中文（台灣）' }, { id: 'zh-CN', label: '中文（中国大陆）' },
   { id: 'ja', label: '日本語' }, { id: 'ko', label: '한국어' },
 ];
 const storageKey = 'misspelled.language';
 export function chooseLocale(preferred = [], saved = null) {
   if (Object.hasOwn(messages, saved)) return saved;
+  if (/^zh-(?:hant-)?hk$/i.test(saved)) return 'zh-TW';
   for (const preference of preferred) {
     const tag = String(preference).toLowerCase();
     if (/^zh(?:-|$)/.test(tag)) {
-      if (/-(hk|mo)(?:-|$)/.test(tag)) return 'zh-HK';
-      if (/-tw(?:-|$)/.test(tag) || tag.includes('-hant')) return 'zh-TW';
+      if (/-(tw|hk|mo)(?:-|$)/.test(tag) || tag.includes('-hant')) return 'zh-TW';
       return 'zh-CN';
     }
     for (const id of ['en', 'ja', 'ko']) if (tag === id || tag.startsWith(`${id}-`)) return id;

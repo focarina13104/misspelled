@@ -3,3 +3,5 @@ dist/
 public/dictionaries/
 public/licenses/
 .superpowers/
+
+.vercel

@@ -50,7 +50,8 @@ h2 { font-size: 19px; line-height: 1.5; letter-spacing: -.4px; font-weight: 650;
 .field-top label { font-size: 12px; font-weight: 600; color: #4b586c; }
 .text-button { background: none; border: 0; padding: 2px 0; font-size: 11px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 .text-button:hover:enabled { color: var(--primary); }
-#word { width: 100%; display: block; resize: none; height: 78px; padding: 16px 18px; border: 1px solid #d6e0ee; border-radius: 11px; color: #172033; background: #fbfcff; font-size: 28px; font-weight: 550; line-height: 1.5; outline: none; white-space: pre; }
+#word, .clear-input-snapshot { width: 100%; display: block; resize: none; height: 78px; padding: 16px 18px; border: 1px solid #d6e0ee; border-radius: 11px; color: #172033; background: #fbfcff; font-size: 28px; font-weight: 550; line-height: 1.5; outline: none; white-space: pre; }
+.clear-snapshot { position: fixed; margin: 0; z-index: 1; pointer-events: none; user-select: none; }
 #word:focus { border-color: #779ff6; box-shadow: 0 0 0 3px #2563eb0d; background: #fff; }
 #word[aria-invalid="true"] { border-color: #d76060; }
 .field-meta { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; margin-top: 9px; color: #768296; font-size: 10px; line-height: 1.6; }

@@ -55,12 +55,12 @@ export function createWordClient({ workerFactory, onChange = () => {} }) {
     invalidate();
     update({ input, result: null, mode: null, status: ready ? 'idle' : state.status === 'error' ? 'error' : 'loading', errorCode: ready ? null : state.errorCode });
   }
-  function run(mode) {
+  function run(mode, input = state.input) {
     if (disposed || !ready || !['check', 'similar'].includes(mode)) return;
     invalidate();
     pending = generation;
     update({ status: 'busy', mode, result: null, errorCode: null });
-    try { worker.postMessage({ id: pending, mode, input: state.input }); }
+    try { worker.postMessage({ id: pending, mode, input }); }
     catch { pending = null; update({ status: 'error', errorCode: 'operationFailed' }); }
   }
   initialize();
